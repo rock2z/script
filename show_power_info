@@ -1,1 +1,15 @@
-ioreg -rn AppleSmartBattery | awk '/AdapterDetails/{v=$0; gsub(/.*"AdapterVoltage"=/,"",v); gsub(/[^0-9].*/,"",v); c=$0; gsub(/.*"Current"=/,"",c); gsub(/[^0-9].*/,"",c)} /"CycleCount" = /{cy=$NF} /"DesignCapacity" = /{if(!d)d=$NF} /"NominalChargeCapacity" = /{n=$NF} END{printf "⚡ %.1fW  🔋 %s cycles  %.1f%% health\n", v*c/1000000, cy, n*100/d}'
+ioreg -rn AppleSmartBattery | awk '
+  /"AdapterDetails"/{
+    tmp=$0; gsub(/.*"Watts"=/, "", tmp); gsub(/[^0-9].*/, "", tmp); w=tmp
+  }
+  /"CycleCount" = /{cy=$NF}
+  /"DesignCapacity" = /{if(!d)d=$NF}
+  /"NominalChargeCapacity" = /{n=$NF}
+  /"CurrentCapacity" = /{cur=$NF}
+  /"MaxCapacity" = /{if(!mx)mx=$NF}
+  END{
+    pct = cur*100/mx
+    bat = (pct >= 50) ? "🔋" : "🪫"
+    printf "⚡ %dW  🔄 %s cycles  ❤️ %.1f%% health  %s %d%% left\n",
+      w, cy, n*100/d, bat, pct
+  }'
