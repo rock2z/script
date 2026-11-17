@@ -1,15 +1,28 @@
-ioreg -rn AppleSmartBattery | awk '
-  /"AdapterDetails"/{
-    tmp=$0; gsub(/.*"Watts"=/, "", tmp); gsub(/[^0-9].*/, "", tmp); w=tmp
+#!/usr/bin/env zsh
+
+ioreg -rn AppleSmartBattery -w0 | awk '
+  function number(key, pattern, value) {
+    pattern = "\"" key "\"[[:space:]]*=[[:space:]]*"
+    if (!match($0, pattern "[0-9]+")) return ""
+    value = substr($0, RSTART, RLENGTH)
+    sub(pattern, "", value)
+    return value
   }
-  /"CycleCount" = /{cy=$NF}
-  /"DesignCapacity" = /{if(!d)d=$NF}
-  /"NominalChargeCapacity" = /{n=$NF}
-  /"CurrentCapacity" = /{cur=$NF}
-  /"MaxCapacity" = /{if(!mx)mx=$NF}
+  /"AdapterDetails"[[:space:]]*=/{w=number("Watts")}
+  /"CycleCount"[[:space:]]*=/{cy=number("CycleCount")}
+  /"DesignCapacity"[[:space:]]*=/{if(!d)d=number("DesignCapacity")}
+  /"NominalChargeCapacity"[[:space:]]*=/{n=number("NominalChargeCapacity")}
+  /"CurrentCapacity"[[:space:]]*=/{cur=number("CurrentCapacity")}
+  /"MaxCapacity"[[:space:]]*=/{if(!mx)mx=number("MaxCapacity")}
   END{
-    pct = cur*100/mx
-    bat = (pct >= 50) ? "🔋" : "🪫"
-    printf "⚡ %dW  🔄 %s cycles  ❤️ %.1f%% health  %s %d%% left\n",
-      w, cy, n*100/d, bat, pct
+    health = (d > 0 && n != "") ? sprintf("%.1f%%", n*100/d) : "N/A"
+    left = "N/A"
+    bat = "🔋"
+    if (mx > 0 && cur != "") {
+      pct = cur*100/mx
+      left = sprintf("%d%%", pct)
+      bat = (pct >= 50) ? "🔋" : "🪫"
+    }
+    printf "⚡ %dW  🔄 %s cycles  ❤️ %s health  %s %s left\n",
+      w, (cy != "" ? cy : "N/A"), health, bat, left
   }'
